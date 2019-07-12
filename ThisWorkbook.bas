@@ -11,15 +11,25 @@ Sub ExportCode()
     
     Dim prj As VBProject
     Dim cmp As VBComponent
+    Dim ref As Reference
     Dim fso As New FileSystemObject
     Dim path As String
     Dim ext As String
     
     Set prj = ThisWorkbook.VBProject
     
+    
+    
     path = ThisWorkbook.path & "\VBA modules\"
     If Not fso.FolderExists(path) Then fso.CreateFolder path
     
+    Open (path & "refs.txt") For Output As #1
+        
+        For Each ref In prj.References
+            Write #1, ref.FullPath
+        Next
+        
+    Close #1
     
     For Each cmp In prj.VBComponents
         ext = ".bas"
