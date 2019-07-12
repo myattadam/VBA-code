@@ -10,34 +10,86 @@ Attribute VB_Exposed = True
 Option Explicit
 Option Base 1
 
-Public Enum SORTBY
+'Dim data As Variant
+Public data As Variant
+
+' --- Enums ----------------------------------------------------------------------------------------------
+
+Public Enum SortArrayBy
     DESCENDING
     ASCENDING
 End Enum
 
-Dim data As Variant
+Public Enum CALC
+    Sum
+    Average
+End Enum
+
+' --- Default properties ---------------------------------------------------------------------------------
+
+Property Get value(index As Variant) As Variant
+Attribute value.VB_UserMemId = 0
+    value = data(index)
+End Property
+
+Property Let value(index As Variant, value_ As Variant)
+Attribute value.VB_UserMemId = 0
+    If index > Length Then ReDim Preserve data(1 To index)
+    
+    If IsObject(value_) Then
+        Set data(index) = value_
+    Else
+        data(index) = value_
+    End If
+End Property
+
+
+
+' --- Class properties -----------------------------------------------------------------------------------
 
 Property Get List() As Variant
     List = data
 End Property
 
 Property Get Length() As Long
-    Length = UBound(data) - LBound(data) + 1
-End Property
-
-Property Get value(index As Variant) As Variant
-    Attribute Value.VB_UserMemId = 0
-    value = data(index)
-End Property
-
-Property Let value(index As Variant, value_ As Variant)
-    Attribute Value.VB_UserMemId = 0
-    If index > Length Then ReDim Preserve data(1 To index)
-    data(index) = value_
+    Length = LengthOf(data)
 End Property
 
 
-Sub AddTo(arr As Variant, value As Variant)
+
+' --- Class functions ------------------------------------------------------------------------------------
+
+Function Add(value As Variant) As Long
+    AddTo data, value
+    Add = UBound(data)
+End Function
+
+
+Function Calculate(method As CALC) As Variant
+    Select Case method
+        Case CALC.Sum: Calculate = SumOf(data)
+        Case CALC.Average: Calculate = AverageOf(data)
+    End Select
+End Function
+
+
+Sub Sort(method As SortArrayBy, Optional byColumn As Long = -1)
+    QuickSort data, method, byColumn
+End Sub
+
+
+Sub Clear()
+    If IsArray(data) Then Erase data Else data = Empty
+End Sub
+
+Sub Transpose()
+    data = WorksheetFunction.Transpose(data)
+End Sub
+
+
+
+
+Private Sub AddTo(arr As Variant, value As Variant)
     If IsEmpty(arr) Then
         ReDim arr(1 To 1)
     Else
@@ -47,32 +99,72 @@ Sub AddTo(arr As Variant, value As Variant)
     arr(UBound(arr)) = value
 End Sub
 
-Function Add(value As Variant) As Long
-    AddTo data, value
-    Add = UBound(data)
+
+
+Private Function LengthOf(arr As Variant) As Long
+    LengthOf = 0
+    If IsArray(arr) Then LengthOf = UBound(arr) - LBound(arr) + 1
 End Function
 
-Sub Clear()
-    If IsArray(data) Then Erase data Else data = Empty
-End Sub
 
 
-Private Function Compare(method As SORTBY, lhs As Variant, rhs As Variant) As Boolean
+Private Function SumOf(arr As Variant, Optional ByRef value As Variant = 0) As Variant
+    Dim i As Long
+    
+    For i = LBound(arr) To UBound(arr)
+
+        If IsArray(arr(i)) Then
+            SumOf arr(i), value
+        Else
+            Select Case TypeName(arr(i))
+                Case "Integer", "Long", "Single", "Double"
+                    value = value + arr(i)
+            End Select
+        End If
+
+    Next
+
+    SumOf = value
+End Function
+
+Private Function AverageOf(arr As Variant, Optional ByRef value As Variant = 0, Optional ByRef count As Long = 0) As Variant
+    Dim i As Long
+    
+    For i = LBound(arr) To UBound(arr)
+
+        If IsArray(arr(i)) Then
+            AverageOf arr(i), value, count
+        Else
+            Select Case TypeName(arr(i))
+                Case "Integer", "Long", "Single", "Double"
+                    value = value + arr(i)
+                    count = count + 1
+            End Select
+        End If
+
+    Next
+
+    AverageOf = value / count
+End Function
+
+
+
+Private Function Compare(method As SortArrayBy, lhs As Variant, rhs As Variant) As Boolean
+    On Error Resume Next
     Select Case method
-        Case SORTBY.DESCENDING: Compare = lhs < rhs
-        Case SORTBY.ASCENDING: Compare = lhs > rhs
+        Case SortArrayBy.DESCENDING: Compare = lhs < rhs
+        Case SortArrayBy.ASCENDING: Compare = lhs > rhs
     End Select
 End Function
 
-
-Function QuickSort(arr As Variant, method As SORTBY, Optional byColumn As Long = -1) As Variant
+Private Function QuickSort(arr As Variant, method As SortArrayBy, Optional byColumn As Long = -1) As Variant
     Dim left As Variant
     Dim right As Variant
     Dim pivot As Variant
     
     Dim i As Long
     
-    If Arrays.Length(arr) > 1 Then
+    If LengthOf(arr) > 1 Then
     
         pivot = arr(UBound(arr))
         
@@ -80,17 +172,17 @@ Function QuickSort(arr As Variant, method As SORTBY, Optional byColumn As Long =
             If byColumn = -1 Then
         
                 If Compare(method, pivot, arr(i)) Then
-                    Arrays.Add left, arr(i)
+                    AddTo left, arr(i)
                 Else
-                    Arrays.Add right, arr(i)
+                    AddTo right, arr(i)
                 End If
                 
             Else
             
                 If Compare(method, pivot(byColumn), arr(i)(byColumn)) Then
-                    Arrays.Add left, arr(i)
+                    AddTo left, arr(i)
                 Else
-                    Arrays.Add right, arr(i)
+                    AddTo right, arr(i)
                 End If
                 
             End If
@@ -103,15 +195,15 @@ Function QuickSort(arr As Variant, method As SORTBY, Optional byColumn As Long =
         
         If Not IsEmpty(left) Then
             For i = LBound(left) To UBound(left)
-                Arrays.Add arr, left(i)
+                AddTo arr, left(i)
             Next
         End If
         
-        Arrays.Add arr, pivot
+        AddTo arr, pivot
         
         If Not IsEmpty(right) Then
             For i = LBound(right) To UBound(right)
-                Arrays.Add arr, right(i)
+                AddTo arr, right(i)
             Next
         End If
         
@@ -128,58 +220,6 @@ End Function
 
 
 
-
-
-
-'Property Get Sum() As Variant
-'    Dim i As Long
-'
-'    Dim value As Variant
-'    value = 0
-'
-'    For i = LBound(data) To UBound(data)
-'
-'        If IsArray(data(i)) Then
-'
-'            value = value + Sum(data(i))
-'
-'        Else
-'
-'            Select Case TypeName(data(i))
-'                Case "Integer", "Long", "Single", "Double"
-'                    value = value + data(i)
-'            End Select
-'
-'        End If
-'
-'    Next
-'
-'    Sum = value
-'
-'End Property
-'
-'
-'
-'Property Get Average() As Double
-'    Dim i As Long
-'
-'    Dim value As Variant
-'    Dim Count As Long
-'    value = 0
-'
-'    For i = LBound(data) To UBound(data)
-'
-'        Select Case TypeName(data(i))
-'            Case "Integer", "Long", "Single", "Double"
-'                value = value + data(i)
-'                Count = Count + 1
-'        End Select
-'
-'    Next
-'
-'    Average = value / Count
-'
-'End Property
 
 
 
@@ -231,49 +271,3 @@ End Function
 '
 '    Trend = result
 'End Function
-'
-
-'
-'Sub test()
-'
-'    Dim arr As Variant
-'
-'    For i = 0 To 15
-'        num = Int(Rnd() * 5)
-'        code = ChrW(65 + Int(Rnd() * 26))
-'
-'        value = Round(Rnd() * 100, 2)
-'        d = #1/1/2019# + Rnd() * 365
-'
-'        Arrays.Add arr, Array(code, value, CDbl(d))
-'    Next
-'
-'    Arrays.Add arr, Array("#", 0, 0)
-'
-'
-'    Debug.Print ""
-'
-'    For i = LBound(arr) To UBound(arr)
-'        Debug.Print arr(i)(0); vbTab; arr(i)(1); vbTab; CDate(arr(i)(2))
-'    Next
-'
-'    arr = QuickSort(arr, 2)
-'    arr = QuickSort(arr, 0)
-'
-'    Debug.Print ""
-'
-'    For i = LBound(arr) To UBound(arr)
-'        Debug.Print arr(i)(0); vbTab; arr(i)(1); vbTab; CDate(arr(i)(2))
-'    Next
-'
-'    Dim fub As Variant
-'    ReDim fub(1 To 5)
-'
-'    Clear fub
-'
-'    Debug.Print "Done"
-'
-'End Sub
-'
-'
-
